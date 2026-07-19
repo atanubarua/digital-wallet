@@ -1,9 +1,23 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
+    // "NodeNext" (not the classic "commonjs") because @wallet/service-kit
+    // uses a package.json "exports" map with subpaths (e.g. "./tracing") -
+    // only "node16"/"nodenext" module+resolution understand that field for
+    // type resolution ("bundler" resolution looked tempting but TS rejects
+    // it unless "module" is es2015+ or "preserve", which isn't compatible
+    // with plain tsc-emitted CommonJS). "NodeNext" mirrors Node's REAL dual
+    // CJS/ESM behavior: since no package.json here declares
+    // `"type": "module"`, every file is still treated and EMITTED as
+    // CommonJS (satisfying OpenTelemetry's "instrument before first
+    // require()" need - see tracing/index.ts) - NodeNext's stricter
+    // explicit-file-extension rule for relative imports only applies to
+    // files actually being compiled as ESM, which none of ours are.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
-    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "declaration": true,
     "sourceMap": true,
     "strict": true,

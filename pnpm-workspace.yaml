@@ -1,3 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  # protobufjs is a transitive dependency of the OpenTelemetry OTLP
+  # exporters - its install script compiles bundled proto definitions and
+  # is required for the package to function. Well-known, widely-used
+  # library; approved.
+  protobufjs: true

@@ -1,0 +1,7 @@
+{
+  "//": "Watches compiled output (dist/), not source - tsc --watch (run alongside this via `concurrently`, see package.json's start:dev) does the actual TypeScript compilation. Using nodemon here - not NestJS CLI's own `--watch` restart - specifically because Nest CLI's tsc-watch restart does NOT wait for the previous process to fully release its port before starting a new one, causing an EADDRINUSE crash on every file change. nodemon's process management correctly waits for the old process's 'exit' event first.",
+  "watch": ["dist"],
+  "ext": "js",
+  "delay": 300,
+  "exec": "node dist/main.js"
+}

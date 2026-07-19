@@ -199,6 +199,73 @@ services:
     networks:
       - wallet-net
 
+  auth:
+    # First real backend service, and the exemplar for the "service
+    # template" every later service copies: tracing, metrics, health,
+    # structured logging, graceful shutdown, all from @wallet/service-kit
+    # (see packages/service-kit). This commit wires up ONLY that template -
+    # no real OTP/JWT/PIN logic yet (docs/architecture.md's Auth row) - that
+    # lands in a follow-up commit on top of this proven foundation.
+    build:
+      # Context is the repo ROOT, not apps/auth - this is a pnpm workspace,
+      # so building auth's image needs the root lockfile and
+      # packages/service-kit's manifest, not just this one app's files.
+      context: ..
+      dockerfile: apps/auth/Dockerfile
+      target: dev
+    container_name: wallet-auth
+    restart: unless-stopped
+    environment:
+      # Auth connects to its OWN logical database (auth_db) inside the
+      # SHARED postgres container, and to the shared Redis instance (later
+      # used for OTP storage) - same "one container, no cross-service
+      # credentials" pattern as postgres/redis above (ADR-0006 dev-env note).
+      DATABASE_URL: postgres://${POSTGRES_USER:-wallet}:${POSTGRES_PASSWORD}@postgres:5432/auth_db
+      REDIS_URL: redis://redis:6379
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_SERVICE_NAME: auth
+      PORT: "4001"
+      NODE_ENV: development
+    ports:
+      # Backend-service port convention, established here for every later
+      # service: 3000 stays reserved for future Next.js frontends, 3001 is
+      # Grafana - backend services take the 4000s block, one port per
+      # service in introduction order. Auth is first -> 4001.
+      - "4001:4001"
+    volumes:
+      # Whole monorepo, not just apps/auth - this is a pnpm workspace, so
+      # hot reload and `pnpm --filter` both need the root lockfile and
+      # packages/service-kit visible inside the container too.
+      - ..:/workspace
+      # Anonymous volumes over each node_modules: without these, the bind
+      # mount above would shadow the Linux-installed node_modules baked into
+      # the image with whatever (possibly Windows-installed, wrong-platform)
+      # node_modules exists on the host at these paths.
+      - /workspace/node_modules
+      - /workspace/apps/auth/node_modules
+      - /workspace/packages/service-kit/node_modules
+    healthcheck:
+      # No curl in node:24-slim by design (keeps the image lean) - use
+      # Node's own http client instead.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:4001/health/ready', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wallet-net
+
 networks:
   # Dedicated bridge network so services resolve each other by name
   # (e.g. "postgres", "redis", "redpanda") instead of localhost/IP - this is
