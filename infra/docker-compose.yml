@@ -136,6 +136,69 @@ services:
     networks:
       - wallet-net
 
+  prometheus:
+    # Metrics pillar (docs/architecture.md 6.4): polls every target below on
+    # an interval and stores the numbers as time series. Pinned to the
+    # version confirmed working (`prometheus --version` inside the
+    # container), same discipline as redpanda.
+    image: prom/prometheus:v3.13.1
+    container_name: wallet-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - wallet-prometheus-data:/prometheus
+    ports:
+      - "9090:9090" # Prometheus UI - browse to check scrape target health
+    networks:
+      - wallet-net
+
+  grafana:
+    # Dashboards over Prometheus's metrics and a query UI over Jaeger's
+    # traces (both wired up automatically - see
+    # observability/grafana/provisioning/datasources/datasources.yml).
+    # Pinned to the version confirmed working (via GET /api/health).
+    image: grafana/grafana:13.1.0
+    container_name: wallet-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      # Host port 3001, not 3000 - the customer/agent/admin frontends
+      # (Next.js) will want 3000 later, so we free it up now rather than
+      # fight over it in a future phase.
+      - "3001:3000"
+    volumes:
+      - wallet-grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - wallet-net
+
+  jaeger:
+    # Traces pillar (docs/architecture.md 6.4): the one that lets us watch
+    # ONE request's path across MULTIPLE containers - the whole point of
+    # Phase 0 step 7. "all-in-one" bundles collector + query UI + storage
+    # in a single image with in-memory storage - traces don't survive a
+    # restart, which is fine for dev/demo (a real deployment would use a
+    # persistent backend like Elasticsearch or Cassandra).
+    # Pinned by digest, not a version tag - the all-in-one image ships no
+    # queryable version string/label, so the content digest is the only
+    # reliable way to pin exactly what was confirmed working.
+    image: jaegertracing/all-in-one@sha256:ab6f1a1f0fb49ea08bcd19f6b84f6081d0d44b364b6de148e1798eb5816bacac
+    container_name: wallet-jaeger
+    restart: unless-stopped
+    environment:
+      # Explicit even though it defaults to true on recent versions -
+      # documents that services will send traces via the OpenTelemetry
+      # Protocol (OTLP), not Jaeger's older native format.
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger UI - browse to see traces
+      - "4317:4317"   # OTLP gRPC receiver (services push traces here)
+      - "4318:4318"   # OTLP HTTP receiver
+    networks:
+      - wallet-net
+
 networks:
   # Dedicated bridge network so services resolve each other by name
   # (e.g. "postgres", "redis", "redpanda") instead of localhost/IP - this is
@@ -148,3 +211,5 @@ volumes:
   wallet-postgres-data:
   wallet-redis-data:
   wallet-redpanda-data:
+  wallet-prometheus-data:
+  wallet-grafana-data:

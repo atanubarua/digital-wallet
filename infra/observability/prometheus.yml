@@ -1,0 +1,24 @@
+# Prometheus scrape config. Every entry here is a target Prometheus polls
+# on an interval and stores as time-series data - this is the "metrics"
+# pillar (see docs/architecture.md section 6.4).
+#
+# Service scrape targets get added here as each service exposes a
+# /metrics endpoint (Phase 0 step 5+). For now: Prometheus monitoring
+# itself, and Redpanda's built-in metrics endpoint.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: redpanda
+    # /public_metrics is Redpanda's curated endpoint meant for external
+    # monitoring (as opposed to /metrics, which is more low-level/internal).
+    # "redpanda:9644" is the internal Docker-network address (see
+    # docker-compose.yml's redpanda service) - Prometheus reaches it the
+    # same way any other container on wallet-net would.
+    metrics_path: /public_metrics
+    static_configs:
+      - targets: ["redpanda:9644"]

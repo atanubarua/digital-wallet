@@ -1,0 +1,19 @@
+# Grafana "provisioning" auto-configures data sources on container start -
+# without this, you'd click through Grafana's UI by hand every time the
+# container is recreated. Mounted read-only into
+# /etc/grafana/provisioning/datasources/ (see docker-compose.yml).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    # Grafana's Jaeger datasource talks to the same HTTP port the Jaeger UI
+    # uses (16686) - it's Jaeger's query-service API, not a separate port.
+    url: http://jaeger:16686
