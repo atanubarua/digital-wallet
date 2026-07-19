@@ -90,6 +90,21 @@ engineer.
   pure high-throughput cache/search need) → introduce a specialized store for that service
   only, still behind its own boundary.
 
+### Dev-environment note (added 2026-07-20, Phase 0)
+
+The development host has 16GB RAM, with Docker's WSL2 VM capped at ~8GB — running one
+**Postgres server process per service** would cost ~50–100MB of idle overhead each, adding up
+fast alongside Redpanda, Prometheus, Grafana, and Jaeger in the same budget. For local/dev
+Compose, we run **one Postgres container** with **one logical database per service**
+(`auth_db`, `user_db`, `ledger_db`, `transaction_db`, `history_db` — see
+`infra/docker-compose.yml` and `infra/postgres/init-databases.sh`).
+
+This preserves the actual boundary this ADR is about: no service is ever granted credentials
+to another service's database, so there is still no cross-service querying and no shared
+schema — only the **physical container** is shared, not the logical isolation. Production
+(the VPS deployment) may still run separate Postgres instances per service if resources allow;
+this note applies to the dev/demo Compose setup only.
+
 ## Action Items
 
 1. [ ] Define per-service schemas; add a lint/CI check forbidding cross-schema access.
