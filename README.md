@@ -64,7 +64,3 @@ docker compose up
 | 5 | Fraud engine, admin dashboard | Stream processing |
 | 6 | Load + **chaos testing** | Resilience, backpressure, graceful degradation |
 | 7 | Diagrams, runbooks, failure postmortems | Communicating system design |
-
-## License
-
-MIT — see [`LICENSE`](./LICENSE).
