@@ -1,0 +1,90 @@
+# Phase 0 infra layer 1: Postgres + Redis.
+#
+# This file is built up incrementally on purpose (see docs/architecture.md
+# Phase 0). Redpanda and the observability stack land in later commits, each
+# verified working before the next is added - so if something breaks, we
+# know exactly which layer broke it.
+#
+# Run from the repo root:
+#   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d
+#   docker compose -f infra/docker-compose.yml ps
+#   docker compose -f infra/docker-compose.yml logs -f
+#
+# (infra/.env holds secrets/config and is gitignored - see infra/.env.example)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wallet-postgres
+    restart: unless-stopped
+    environment:
+      # A single Postgres SERVER for the whole dev stack (RAM budget on a
+      # 16GB host - see docs/adr/0006-database-per-service.md's dev-env
+      # note). Each service still gets its own DATABASE within this server
+      # (created by init-databases.sh below), and no service is ever given
+      # credentials to another service's database - so the "no shared
+      # tables, no cross-service queries" rule from ADR-0006 still holds.
+      # Only the physical container is shared, not the logical boundary.
+      POSTGRES_USER: ${POSTGRES_USER:-wallet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in infra/.env}
+      # POSTGRES_DB creates one default DB on first boot; our real per-service
+      # databases are created by the init script mounted below.
+      POSTGRES_DB: postgres
+    ports:
+      # Exposed to the host so you can connect with a GUI client (DBeaver,
+      # TablePlus, psql) while developing. Services running IN Docker will
+      # reach this via the service name "postgres", not localhost.
+      - "5432:5432"
+    volumes:
+      # Named volume: Postgres data survives `docker compose down` (only
+      # `down -v` or manually removing the volume wipes it). This matters
+      # once real ledger data exists in here.
+      - wallet-postgres-data:/var/lib/postgresql/data
+      # Runs once against a FRESH data directory only (Postgres image
+      # convention). If you edit this script after the volume already
+      # exists, you must drop the volume for it to re-run.
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      # `depends_on: condition: service_healthy` (used by later services)
+      # waits for this, not just for the container to be "running" - a
+      # container can be up before Postgres is actually ready to accept
+      # connections.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wallet}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wallet-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: wallet-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      # Redis here is cache + coordination (idempotency keys, rate limits,
+      # OTP storage, distributed locks - see docs/architecture.md ��6.1-6.2).
+      # None of that needs to be durable across a full stack rebuild, but
+      # persisting it avoids re-triggering OTP/cache-miss flows on every
+      # restart during development.
+      - wallet-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wallet-net
+
+networks:
+  # Dedicated bridge network so services resolve each other by name
+  # (e.g. "postgres", "redis") instead of localhost/IP - this is the
+  # container-network equivalent of service discovery, and it's how
+  # every later service will reach these two.
+  wallet-net:
+    name: wallet-net
+
+volumes:
+  wallet-postgres-data:
+  wallet-redis-data:
