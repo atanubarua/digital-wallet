@@ -1,9 +1,9 @@
-# Phase 0 infra layer 1: Postgres + Redis.
+# Phase 0 infra: Postgres + Redis (layer 1), Redpanda (layer 2).
 #
 # This file is built up incrementally on purpose (see docs/architecture.md
-# Phase 0). Redpanda and the observability stack land in later commits, each
-# verified working before the next is added - so if something breaks, we
-# know exactly which layer broke it.
+# Phase 0). Each layer is verified working before the next is added - so if
+# something breaks, we know exactly which layer broke it. The observability
+# stack (Prometheus/Grafana/Jaeger) lands in a later commit.
 #
 # Run from the repo root:
 #   docker compose -f infra/docker-compose.yml --env-file infra/.env up -d
@@ -64,8 +64,8 @@ services:
       - "6379:6379"
     volumes:
       # Redis here is cache + coordination (idempotency keys, rate limits,
-      # OTP storage, distributed locks - see docs/architecture.md ��6.1-6.2).
-      # None of that needs to be durable across a full stack rebuild, but
+      # OTP storage, distributed locks - see docs/architecture.md section
+      # 6.1-6.2). None of that needs to be durable across a full stack rebuild, but
       # persisting it avoids re-triggering OTP/cache-miss flows on every
       # restart during development.
       - wallet-redis-data:/data
@@ -77,14 +77,74 @@ services:
     networks:
       - wallet-net
 
+  redpanda:
+    # Kafka-API-compatible event bus (see docs/adr/0002-kafka-event-bus.md).
+    # This is a single-node DEV cluster - fine for local/demo, not how you'd
+    # run it for real durability/HA (that would be 3+ nodes).
+    #
+    # Pinned to the exact version confirmed working in Phase 0 (verified via
+    # `docker exec wallet-redpanda rpk version`) - "latest" would silently
+    # drift to a different version on a future `docker compose pull`.
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.13
+    container_name: wallet-redpanda
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      # --mode dev-container applies sane single-node defaults (memory,
+      # topic replication = 1, etc.) so we don't have to hand-tune every
+      # broker flag for a laptop-scale dev cluster.
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      # Two listeners per API: "internal" is how OTHER CONTAINERS on
+      # wallet-net reach it (hostname "redpanda"); "external" is how the
+      # HOST (your WSL shell, a GUI tool) reaches it, via localhost on the
+      # mapped ports below. Services we build later will use the internal
+      # address; you'll use the external one to poke at it by hand.
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr
+      - internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr
+      - internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr
+      - internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr
+      - redpanda:33145
+      - --advertise-rpc-addr
+      - redpanda:33145
+    ports:
+      - "19092:19092" # Kafka API (from the host)
+      - "18081:18081" # Schema registry
+      - "18082:18082" # HTTP proxy (produce/consume over REST)
+      - "19644:9644"  # Admin API - also serves Prometheus metrics at
+                      # /metrics and /public_metrics; wired up when we add
+                      # the observability stack.
+    volumes:
+      - wallet-redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      # `rpk` (Redpanda's CLI) ships inside the image - this is the same
+      # tool we use by hand below to prove produce/consume works.
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wallet-net
+
 networks:
   # Dedicated bridge network so services resolve each other by name
-  # (e.g. "postgres", "redis") instead of localhost/IP - this is the
-  # container-network equivalent of service discovery, and it's how
-  # every later service will reach these two.
+  # (e.g. "postgres", "redis", "redpanda") instead of localhost/IP - this is
+  # the container-network equivalent of service discovery, and it's how
+  # every later service will reach these three.
   wallet-net:
     name: wallet-net
 
 volumes:
   wallet-postgres-data:
   wallet-redis-data:
+  wallet-redpanda-data:
