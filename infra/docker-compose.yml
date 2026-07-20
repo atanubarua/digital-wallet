@@ -226,6 +226,9 @@ services:
       OTEL_SERVICE_NAME: auth
       PORT: "4001"
       NODE_ENV: development
+      # Added when Auth became a Kafka producer for the first time (the
+      # /demo/register endpoint - see apps/auth/src/demo/demo.controller.ts).
+      KAFKA_BROKERS: redpanda:9092
     ports:
       # Backend-service port convention, established here for every later
       # service: 3000 stays reserved for future Next.js frontends, 3001 is
@@ -244,6 +247,7 @@ services:
       - /workspace/node_modules
       - /workspace/apps/auth/node_modules
       - /workspace/packages/service-kit/node_modules
+      - /workspace/packages/contracts/node_modules
     healthcheck:
       # No curl in node:24-slim by design (keeps the image lean) - use
       # Node's own http client instead.
@@ -262,6 +266,61 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks:
+      - wallet-net
+
+  user:
+    # Second real backend service, built to mirror auth's exact template
+    # (see that service's comments for the shared rationale) plus two new
+    # things: a Kafka consumer (UserRegisteredConsumer) and a synchronous
+    # REST call back to Auth (GET /demo/ping-auth) - together these prove
+    # the Phase 0 finish line: one request producing a SINGLE Jaeger trace
+    # spanning both the user and auth containers.
+    build:
+      context: ..
+      dockerfile: apps/user/Dockerfile
+      target: dev
+    container_name: wallet-user
+    restart: unless-stopped
+    environment:
+      # User owns user_db - no Redis dependency (docs/architecture.md's
+      # User/KYC row), unlike Auth.
+      DATABASE_URL: postgres://${POSTGRES_USER:-wallet}:${POSTGRES_PASSWORD}@postgres:5432/user_db
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_SERVICE_NAME: user
+      PORT: "4002"
+      NODE_ENV: development
+      KAFKA_BROKERS: redpanda:9092
+      # How User reaches Auth for its synchronous demo call.
+      AUTH_SERVICE_URL: http://auth:4001
+    ports:
+      # Continues the backend port convention - user is second -> 4002.
+      - "4002:4002"
+    volumes:
+      - ..:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/user/node_modules
+      - /workspace/packages/service-kit/node_modules
+      - /workspace/packages/contracts/node_modules
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:4002/health/ready', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
         condition: service_healthy
     networks:
       - wallet-net

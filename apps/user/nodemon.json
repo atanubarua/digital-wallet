@@ -1,0 +1,7 @@
+{
+  "//": "See apps/auth/nodemon.json for why nodemon is used instead of NestJS CLI's own --watch restart (EADDRINUSE race).",
+  "watch": ["dist"],
+  "ext": "js",
+  "delay": 300,
+  "exec": "node dist/main.js"
+}

@@ -5,8 +5,10 @@ import {
   HealthModule,
   pgHealthIndicator,
   redisHealthIndicator,
+  MessagingModule,
 } from "@wallet/service-kit";
 import { AppController } from "./app.controller";
+import { DemoController } from "./demo/demo.controller";
 
 @Module({
   imports: [
@@ -21,7 +23,11 @@ import { AppController } from "./app.controller";
         redisHealthIndicator("redis", process.env.REDIS_URL as string),
       ],
     }),
+    MessagingModule.forRoot({
+      clientId: "auth",
+      brokers: (process.env.KAFKA_BROKERS ?? "redpanda:9092").split(","),
+    }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, DemoController],
 })
 export class AppModule {}

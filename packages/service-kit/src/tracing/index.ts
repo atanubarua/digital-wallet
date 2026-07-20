@@ -20,6 +20,13 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
+// Re-exported so consuming services never need "@opentelemetry/api" as their
+// own direct dependency - same "service-kit owns its telemetry deps"
+// pattern already used for nestjs-pino's Logger. `trace` lets a service
+// start its own manually-named spans (see
+// apps/user/src/demo/demo.controller.ts) without a direct OTel dependency.
+export { trace } from "@opentelemetry/api";
+
 export interface TracingOptions {
   /** Used as the "service.name" resource attribute - this is what shows up
    * as the service selector in the Jaeger UI. */

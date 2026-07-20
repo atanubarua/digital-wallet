@@ -27,3 +27,7 @@ scrape_configs:
     # Default /metrics path - see packages/service-kit's MetricsController.
     static_configs:
       - targets: ["auth:4001"]
+
+  - job_name: user
+    static_configs:
+      - targets: ["user:4002"]

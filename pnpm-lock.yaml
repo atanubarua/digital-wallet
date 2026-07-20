@@ -41,6 +41,9 @@ importers:
       '@nestjs/terminus':
         specifier: 11.1.1
         version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@5.5.0))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@wallet/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@wallet/service-kit':
         specifier: workspace:*
         version: link:../../packages/service-kit
@@ -70,6 +73,58 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  apps/user:
+    dependencies:
+      '@nestjs/common':
+        specifier: 11.1.28
+        version: 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
+      '@nestjs/core':
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: 11.1.28
+        version: 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.1.28)(supports-color@10.2.2)
+      '@nestjs/terminus':
+        specifier: 11.1.1
+        version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@wallet/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@wallet/service-kit':
+        specifier: workspace:*
+        version: link:../../packages/service-kit
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+    devDependencies:
+      '@nestjs/cli':
+        specifier: 11.0.24
+        version: 11.0.24(@types/node@24.13.3)(prettier@3.9.5)
+      '@nestjs/schematics':
+        specifier: 11.1.0
+        version: 11.1.0(chokidar@4.0.3)(prettier@3.9.5)(typescript@5.9.3)
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      concurrently:
+        specifier: 10.0.3
+        version: 10.0.3
+      nodemon:
+        specifier: 3.1.14
+        version: 3.1.14
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  packages/contracts:
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   packages/service-kit:
     dependencies:
       '@opentelemetry/api':
@@ -87,6 +142,9 @@ importers:
       ioredis:
         specifier: 5.11.1
         version: 5.11.1(supports-color@10.2.2)
+      kafkajs:
+        specifier: 2.2.4
+        version: 2.2.4
       nestjs-pino:
         specifier: 4.6.1
         version: 4.6.1(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
@@ -2007,6 +2065,10 @@ packages:
 
   jsonfile@6.2.1:
     resolution: {integrity: sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q==}
+
+  kafkajs@2.2.4:
+    resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
+    engines: {node: '>=14.0.0'}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -5243,6 +5305,8 @@ snapshots:
       universalify: 2.0.1
     optionalDependencies:
       graceful-fs: 4.2.11
+
+  kafkajs@2.2.4: {}
 
   keyv@4.5.4:
     dependencies:
